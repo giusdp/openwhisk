@@ -53,6 +53,7 @@ RUN curl -sSL -o swagger-ui-v${SWAGGER_UI_VERSION}.tar.gz --no-verbose https://g
 # Copy app jars
 ADD build/distributions/controller.tar /
 
+
 COPY init.sh /
 RUN chmod +x init.sh
 
@@ -63,5 +64,6 @@ RUN adduser -D -u ${UID} -h /home/${NOT_ROOT_USER} -s /bin/bash ${NOT_ROOT_USER}
 # The non-root user should have access on the directory and corresponding permission to make changes on it.
 #USER ${NOT_ROOT_USER}
 
+COPY configLB.yml /
 EXPOSE 8080
 CMD ["./init.sh", "0"]

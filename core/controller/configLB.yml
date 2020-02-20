@@ -1,0 +1,15 @@
+default:
+  - workers: "*"
+    strategy: random
+    invalidate:
+      - max_concurrent_invocations: 100
+      - capacity_used: 50
+
+couchDB:
+  - workers:
+      - worker
+      - laptop
+    strategy: random
+    invalidate:
+      - max_concurrent_invocations: 100
+      - capacity_used: 50

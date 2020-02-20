@@ -17,6 +17,8 @@
 
 package org.apache.openwhisk.core.loadBalancer
 
+import java.io.FileWriter
+
 import akka.actor.ActorRef
 import akka.actor.ActorRefFactory
 import java.util.concurrent.ThreadLocalRandom
@@ -288,6 +290,12 @@ class ShardingContainerPoolBalancer(
       None
     }
 
+    val fw = new FileWriter("sentToWorker.txt", true)
+    try {
+      fw.write("ShardingLB "+ShardingContainerPoolBalancer.latestInvokerChosen+"\n")
+    }
+    finally fw.close()
+
     chosen
       .map { invoker =>
         // MemoryLimit() and TimeLimit() return singletons - they should be fast enough to be used here
@@ -382,6 +390,7 @@ object ShardingContainerPoolBalancer extends LoadBalancerProvider {
       } else primes
     })
 
+  var latestInvokerChosen : String = ""
   /**
    * Scans through all invokers and searches for an invoker tries to get a free slot on an invoker. If no slot can be
    * obtained, randomly picks a healthy invoker.
@@ -405,21 +414,25 @@ object ShardingContainerPoolBalancer extends LoadBalancerProvider {
     step: Int,
     stepsDone: Int = 0)(implicit logging: Logging, transId: TransactionId): Option[(InvokerInstanceId, Boolean)] = {
     val numInvokers = invokers.size
-
+    latestInvokerChosen = ""
     if (numInvokers > 0) {
       val invoker = invokers(index)
       //test this invoker - if this action supports concurrency, use the scheduleConcurrent function
       if (invoker.status.isUsable && dispatched(invoker.id.toInt).tryAcquireConcurrent(fqn, maxConcurrent, slots)) {
+        latestInvokerChosen = "Invokers to use: " + numInvokers.toString + " Chosen invoker:" + invoker.id.uniqueName.getOrElse("")
         Some(invoker.id, false)
       } else {
         // If we've gone through all invokers
         if (stepsDone == numInvokers + 1) {
           val healthyInvokers = invokers.filter(_.status.isUsable)
+          latestInvokerChosen = healthyInvokers.toString()
           if (healthyInvokers.nonEmpty) {
             // Choose a healthy invoker randomly
             val random = healthyInvokers(ThreadLocalRandom.current().nextInt(healthyInvokers.size)).id
             dispatched(random.toInt).forceAcquireConcurrent(fqn, maxConcurrent, slots)
             logging.warn(this, s"system is overloaded. Chose invoker${random.toInt} by random assignment.")
+            latestInvokerChosen += "Invokers to use: " + numInvokers.toString + "Chosen invoker:" + random.uniqueName.getOrElse("")
+
             Some(random, true)
           } else {
             None
